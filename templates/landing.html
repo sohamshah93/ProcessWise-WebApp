@@ -1,0 +1,201 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Create Templates</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    </head>
+    <body>
+    <div class="container">
+        <h1 class="text-center mt-5">Welcome to ProcessWise</h1>
+    </div>
+    <div class="text-center">
+        <a href="{{ url_for('uploader') }}" class="btn btn-primary mt-3">Go to Document Uploader</a>
+        <a href="{{ url_for('modify_templates') }}" class="btn btn-secondary mt-3">Modify Templates</a>
+    </div>
+    <div class="container mt-5">
+        <h2>Create a Template</h2>
+        <form id="templateForm">
+            <div class="mb-3">
+                <label for="templateName" class="form-label">Template Name</label>
+                <input type="text" class="form-control" id="templateName" required>
+            </div>
+            <div class="mb-3">
+                <label for="documentType" class="form-label">Document Type</label>
+                <select class="form-select" id="documentType" required>
+                    <option value="">Choose...</option>
+                    <option value="Invoice">Invoice</option>
+                    <option value="Purchase Order">Purchase Order</option>
+                    <option value="Receipt">Receipt</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Prompt Fields</label>
+            </div>
+            <div class="mb-3" id="fieldsContainer">
+                <!-- Added fields will be displayed here -->
+            </div>
+            <button type="button" id="addField" class="btn btn-secondary mb-3">Add Field</button>
+            <button type="submit" class="btn btn-primary">Save Template</button>
+        </form>
+    </div>
+    <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="infoModalLabel">Category Information</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Column Fields:</strong> Fields that appear in the item tables (e.g., Price, Item Description, Quantity). Multiple values are present in these fields.</p>
+                    <p><strong>Simple Fields:</strong> Fields that have one unique value (e.g., Invoice Number, Invoice Date).</p>
+                    <p><strong>Other:</strong> Any field that does not fit into the above categories.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let fieldCount = 1;
+
+      function changeFieldType() {
+        const documentType = $("#documentType").val();
+        if (documentType !== "") {
+            $("input.prompt-field").autocomplete({
+                minLength: 2,
+                source: function(request, response) {
+                    $.ajax({
+                        url: "/autocomplete",
+                        type: "POST",
+                        data: {
+                            input: request.term,
+                            documentType: documentType
+                        },
+                        contentType: "application/json",
+                        success: function(data) {
+                            console.log("Autocomplete data: ", data);
+                            response(data.suggestions);
+                        },
+                        error: function (jqXHR, textStatus, errorThrown) {
+                            console.error("Autocomplete error: ", textStatus, errorThrown);
+                        }
+                    });
+                }
+            });
+        }
+      }
+
+     function addField() {
+      const newField = $(`<div class="row mt-2">
+                            <div class="col-5">
+                              <input type="text" id="field${fieldCount}" class="form-control prompt-field" placeholder="Field ${fieldCount}">
+                            </div>
+                            <div class="col-5">
+                              <select class="form-select field-category" required>
+                                <option value="">Select category...</option>
+                                <option value="Column Fields">Column Fields</option>
+                                <option value="Simple Fields">Simple Fields</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </div>
+                            <div class="col-1">
+                              <button type="button" class="btn btn-danger delete-field">Delete</button>
+
+                            </div>
+                            <div class="col-1">
+                              <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#infoModal">i</button>
+
+                            </div>
+                          </div>`);
+
+      $("#fieldsContainer").append(newField);
+      fieldCount++;
+    }
+
+      function deleteField(element) {
+        element.closest(".input-group").remove();
+        resetFieldNumbers();
+      }
+
+      function resetFieldNumbers() {
+        $(".prompt-field").each(function(index) {
+          $(this).attr("id", `field${index + 1}`);
+          $(this).attr("placeholder", `Field ${index + 1}`);
+        });
+      }
+
+      function saveTemplate() {
+        const templateName = $("#templateName").val();
+        const documentType = $("#documentType").val();
+        const prompt = [];
+
+        if (!templateName || !documentType) {
+          alert("Please provide a template name and select a document type.");
+          return;
+        }
+        $(".row").each(function () {
+            const field = $(this).find(".prompt-field").val();
+            const category = $(this).find(".field-category").val();
+
+            if (field && category) {
+                prompt.push({
+                field: field,
+                category: category
+                });
+            }
+        });
+
+        if (prompt.length === 0 || prompt.some(item => !item.field || !item.category)) {
+          alert("Please add at least one field.");
+          return;
+        }
+
+        const data = {
+          template_name: templateName,
+          document_type: documentType,
+          prompt: prompt,
+        };
+
+        $.ajax({
+          url: "/create_template",
+          type: "POST",
+          contentType: "application/json",
+          data: JSON.stringify(data),
+          success: function (response) {
+            alert(response.message);
+            location.reload();
+          },
+          error: function (response) {
+            alert(response.responseJSON.message);
+          },
+        });
+      }
+
+      $(document).ready(function () {
+        $("#addField").on("click", addField);
+        $("#templateForm").on("submit", function(event) {
+          event.preventDefault();
+          saveTemplate();
+        });
+        $("#documentType").on("change", changeFieldType);
+        $("#fieldsContainer").on("click", ".delete-field", function() {
+          deleteField($(this));
+        });
+        $("body").on("input", ".prompt-field", function() {
+          $(this).removeClass("is-invalid");
+        });
+        $("#fieldsContainer").on("click", ".delete-field", function() {
+        $(this).closest(".row").remove();
+          resetFieldNumbers();
+        });
+      });
+    </script>
+    </body>
+    </html>

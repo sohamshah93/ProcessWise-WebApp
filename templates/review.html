@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document Validation Results</title>
+</head>
+<body>
+<h1>Document Validation Results</h1>
+<div>
+  <div id="pdf-images">
+    {% for image in images %}
+    <img src="{{ image }}" alt="PDF page">
+    {% endfor %}
+  </div>
+  <div id="pdf-fields">
+    {% for key, value in fields.items() %}
+    <p><strong>{{ key }}:</strong> {{ value }}</p>
+    {% endfor %}
+  </div>
+</div>
+</body>
+</html>
